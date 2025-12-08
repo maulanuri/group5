@@ -17,12 +17,13 @@ st.set_page_config(
 def set_video_background(video_path: str):
     """Set an mp4 video as full-screen background using HTML/CSS."""
     if not os.path.exists(video_path):
+        st.warning(f"Video background tidak ditemukan: {video_path}")
         return
 
     with open(video_path, "rb") as f:
         data = f.read()
-    b64 = base64.b64encode(data).decode()
-    VIDEO_PATH = "assets/background.mp4" 
+    b64 = base64.b64encode(data).decode("utf-8")
+    video_data_url = f"data:video/mp4;base64,{b64}"
 
     st.markdown(
         f"""
@@ -43,11 +44,12 @@ def set_video_background(video_path: str):
         }}
         </style>
         <video class="video-bg" autoplay muted loop playsinline>
-            <source src="{VIDEO_PATH}" type="video/mp4">
+            <source src="{video_data_url}" type="video/mp4">
         </video>
         """,
         unsafe_allow_html=True,
     )
+
 set_video_background("assets/background.mp4")
 
 # ----- Initialize Session State -----
@@ -1083,6 +1085,7 @@ for i in range(2, 4):
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
                 st.markdown(f"{t['team_group']} 5")
+
 
 
 
