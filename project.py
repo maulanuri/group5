@@ -12,6 +12,34 @@ st.set_page_config(
     page_title="🧮 Matrix Transformations in Image Processing",
     layout="wide"
 )
+# ---------- VIDEO BACKGROUND (HTML langsung) ----------
+
+VIDEO_PATH = "assets/background.mp4"  # sesuaikan path ini dengan lokasi videomu
+
+st.markdown(
+    f"""
+    <style>
+    .video-bg {{
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        min-width: 100%;
+        min-height: 100%;
+        width: auto;
+        height: auto;
+        z-index: -1;
+        object-fit: cover;
+    }}
+    .stApp {{
+        background: transparent !important;
+    }}
+    </style>
+    <video class="video-bg" autoplay muted loop playsinline>
+        <source src="{VIDEO_PATH}" type="video/mp4">
+    </video>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ----- Initialize Session State -----
 if "theme_mode" not in st.session_state:
@@ -1052,5 +1080,6 @@ for i in range(2, 4):
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
                 st.markdown(f"{t['team_group']} 5")
+
 
 
