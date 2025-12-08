@@ -30,7 +30,7 @@ if "image_filter" not in st.session_state:
 translations = {
     "id": {
         "title": "🧮 Transformasi Matriks dalam Pengolahan Gambar",
-        "subtitle": "📌 Demo interaktif transformasi matriks 2D dan filtering citra",
+        "subtitle": "📌 Demo interaktif transformasi matriks 2D dan filtering Gambar",
         "app_goal": "🎯 **Tujuan aplikasi:** Demo interaktif yang menunjukkan bagaimana transformasi matriks 2D dan filtering Gambar bekerja pada gambar menggunakan konsep aljabar linier.",
         "features": "- 🔁 Transformasi: translasi, scaling, rotasi, shearing, refleksi\n- 🧹 Filtering: blur, sharpen, deteksi tepi, penghapusan background, grayscale, brightness & contrast",
         "concept_1_title": "### 🧊 Transformasi matriks 2D",
@@ -1052,4 +1052,5 @@ for i in range(2, 4):
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
                 st.markdown(f"{t['team_group']} 5")
+
 
