@@ -840,7 +840,7 @@ for i in range(2):
                 st.markdown(f"**{m['name']}**")
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
-                st.markdown(f"{t['team_group']} Group 5")
+                st.markdown(f"{t['team_group']} 5")
 
 cols_row2 = st.columns(2, vertical_alignment="top")
 for i in range(2, 4):
@@ -854,4 +854,5 @@ for i in range(2, 4):
                 st.markdown(f"**{m['name']}**")
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
-                st.markdown(f"{t['team_group']} Group 5")
+                st.markdown(f"{t['team_group']} 5")
+
