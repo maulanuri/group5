@@ -4,6 +4,7 @@ import cv2
 from PIL import Image
 import matplotlib.pyplot as plt
 import os
+from io import BytesIO  # <- untuk download image
 
 # ===================== CONFIG & THEME =====================
 
@@ -252,7 +253,7 @@ base_css = """
 <style>
 .block-container {
     max-width: 1200px;
-    padding: 2.5rem 2rem 1.2rem 2rem;  /* padding-top diperbesar */
+    padding: 2.5rem 2rem 1.2rem 2rem;
 }
 section[data-testid="stExpander"]{
     border-radius:10px;
@@ -483,6 +484,13 @@ def simple_background_removal_hsv(img_rgb):
     fg_rgb = to_streamlit(fg)
     return fg_rgb
 
+def image_to_bytes(img_rgb, fmt="PNG"):
+    """Convert numpy RGB image to bytes for download."""
+    pil_img = Image.fromarray(img_rgb.astype("uint8"))
+    buf = BytesIO()
+    pil_img.save(buf, format=fmt)
+    return buf.getvalue()
+
 def create_square_image_html(image_path, size=140):
     """Create HTML for square cropped image"""
     return f"""
@@ -496,11 +504,8 @@ def safe_display_square_image(path):
     if os.path.exists(path):
         try:
             img = Image.open(path)
-            # Convert to RGB if necessary
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            
-            # Crop to square (center crop)
             width, height = img.size
             min_dim = min(width, height)
             left = (width - min_dim) // 2
@@ -508,18 +513,13 @@ def safe_display_square_image(path):
             right = left + min_dim
             bottom = top + min_dim
             img_cropped = img.crop((left, top, right, bottom))
-            
-            # Resize to standard size
             img_resized = img_cropped.resize((140, 140), Image.Resampling.LANCZOS)
-            
-            # Display with custom HTML wrapper
+
             import base64
-            from io import BytesIO
-            
             buffered = BytesIO()
             img_resized.save(buffered, format="JPEG")
             img_str = base64.b64encode(buffered.getvalue()).decode()
-            
+
             st.markdown(f"""
             <div class="team-photo-container">
                 <img src="data:image/jpeg;base64,{img_str}" alt="Team member"/>
@@ -528,7 +528,6 @@ def safe_display_square_image(path):
         except Exception as e:
             st.error(f"Error loading image: {e}")
     else:
-        # Display placeholder
         st.markdown("""
         <div class="team-photo-container">
             <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#ddd; color:#666;">
@@ -629,6 +628,24 @@ with tools_col_left:
                     translated_img = apply_affine_transform(original_img, T)
                     st.image(translated_img, caption=t["trans_result"], use_column_width=True)
 
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(translated_img, fmt="PNG"),
+                            file_name="translation_result.png",
+                            mime="image/png",
+                            key="dl_trans_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(translated_img, fmt="JPEG"),
+                            file_name="translation_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_trans_jpg"
+                        )
+
             elif st.session_state["geo_transform"] == "scaling":
                 st.markdown(t["scale_settings"])
                 sx = st.slider(t["scale_x"], 0.1, 3.0, 1.0, key="scale_x")
@@ -642,6 +659,24 @@ with tools_col_left:
                     new_h = int(h * sy)
                     scaled_img = apply_affine_transform(original_img, S, output_size=(new_w, new_h))
                     st.image(scaled_img, caption=t["scale_result"], use_column_width=True)
+
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(scaled_img, fmt="PNG"),
+                            file_name="scaling_result.png",
+                            mime="image/png",
+                            key="dl_scale_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(scaled_img, fmt="JPEG"),
+                            file_name="scaling_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_scale_jpg"
+                        )
 
             elif st.session_state["geo_transform"] == "rotation":
                 st.markdown(t["rot_settings"])
@@ -665,6 +700,24 @@ with tools_col_left:
                     rotated_img = apply_affine_transform(original_img, M)
                     st.image(rotated_img, caption=t["rot_result"], use_column_width=True)
 
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(rotated_img, fmt="PNG"),
+                            file_name="rotation_result.png",
+                            mime="image/png",
+                            key="dl_rot_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(rotated_img, fmt="JPEG"),
+                            file_name="rotation_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_rot_jpg"
+                        )
+
             elif st.session_state["geo_transform"] == "shearing":
                 st.markdown(t["shear_settings"])
                 shear_x = st.slider(t["shear_x"], -1.0, 1.0, 0.0, key="shear_x")
@@ -675,6 +728,24 @@ with tools_col_left:
                                    [0,       0,      1]], dtype=np.float32)
                     sheared_img = apply_affine_transform(original_img, Sh)
                     st.image(sheared_img, caption=t["shear_result"], use_column_width=True)
+
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(sheared_img, fmt="PNG"),
+                            file_name="shearing_result.png",
+                            mime="image/png",
+                            key="dl_shear_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(sheared_img, fmt="JPEG"),
+                            file_name="shearing_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_shear_jpg"
+                        )
 
             elif st.session_state["geo_transform"] == "reflection":
                 st.markdown(t["refl_settings"])
@@ -695,6 +766,24 @@ with tools_col_left:
                                        [0, 0, 1]], dtype=np.float32)
                     reflected_img = apply_affine_transform(original_img, Rf)
                     st.image(reflected_img, caption=t["refl_result"], use_column_width=True)
+
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(reflected_img, fmt="PNG"),
+                            file_name="reflection_result.png",
+                            mime="image/png",
+                            key="dl_refl_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(reflected_img, fmt="JPEG"),
+                            file_name="reflection_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_refl_jpg"
+                        )
 
     # Histogram box
     with st.container(border=True):
@@ -754,6 +843,24 @@ with tools_col_right:
                     blurred_rgb = cv2.cvtColor(blurred_gray, cv2.COLOR_GRAY2RGB)
                     st.image(blurred_rgb, caption=t["blur_result"], use_column_width=True)
 
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(blurred_rgb, fmt="PNG"),
+                            file_name="blur_result.png",
+                            mime="image/png",
+                            key="dl_blur_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(blurred_rgb, fmt="JPEG"),
+                            file_name="blur_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_blur_jpg"
+                        )
+
             elif st.session_state["image_filter"] == "sharpen":
                 st.markdown(t["sharpen_settings"])
                 st.write(t["sharpen_desc"])
@@ -769,6 +876,24 @@ with tools_col_right:
                     sharpened_rgb = cv2.cvtColor(sharpened_gray, cv2.COLOR_GRAY2RGB)
                     st.image(sharpened_rgb, caption=t["sharpen_result"], use_column_width=True)
 
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(sharpened_rgb, fmt="PNG"),
+                            file_name="sharpen_result.png",
+                            mime="image/png",
+                            key="dl_sharp_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(sharpened_rgb, fmt="JPEG"),
+                            file_name="sharpen_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_sharp_jpg"
+                        )
+
             elif st.session_state["image_filter"] == "background":
                 st.markdown(t["bg_settings"])
                 method = st.selectbox(
@@ -780,6 +905,24 @@ with tools_col_right:
                     bg_removed_img = simple_background_removal_hsv(original_img)
                     st.image(bg_removed_img, caption=t["bg_result"], use_column_width=True)
 
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(bg_removed_img, fmt="PNG"),
+                            file_name="background_result.png",
+                            mime="image/png",
+                            key="dl_bg_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(bg_removed_img, fmt="JPEG"),
+                            file_name="background_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_bg_jpg"
+                        )
+
             elif st.session_state["image_filter"] == "grayscale":
                 st.markdown(t["gray_settings"])
                 st.write(t["gray_desc"])
@@ -787,6 +930,24 @@ with tools_col_right:
                     gray_img = rgb_to_gray(original_img)
                     gray_rgb = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2RGB)
                     st.image(gray_rgb, caption=t["gray_result"], use_column_width=True)
+
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(gray_rgb, fmt="PNG"),
+                            file_name="grayscale_result.png",
+                            mime="image/png",
+                            key="dl_gray_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(gray_rgb, fmt="JPEG"),
+                            file_name="grayscale_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_gray_jpg"
+                        )
 
             elif st.session_state["image_filter"] == "edge":
                 st.markdown(t["edge_settings"])
@@ -808,6 +969,24 @@ with tools_col_right:
                     edge_img = to_streamlit(edge_bgr)
                     st.image(edge_img, caption=f"{t['edge_result']} ({method_edge})", use_column_width=True)
 
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(edge_img, fmt="PNG"),
+                            file_name="edge_result.png",
+                            mime="image/png",
+                            key="dl_edge_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(edge_img, fmt="JPEG"),
+                            file_name="edge_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_edge_jpg"
+                        )
+
             elif st.session_state["image_filter"] == "brightness":
                 st.markdown(t["bright_settings"])
                 brightness = st.slider(t["bright_brightness"], -100, 100, 0, key="brightness_value")
@@ -815,6 +994,24 @@ with tools_col_right:
                 if st.button(f"{t['btn_apply']} ✅", key="btn_apply_bright", type="primary"):
                     adjusted_img = adjust_brightness_contrast(original_img, brightness, contrast)
                     st.image(adjusted_img, caption=t["bright_result"], use_column_width=True)
+
+                    col_png, col_jpg = st.columns(2)
+                    with col_png:
+                        st.download_button(
+                            label="⬇️ Download PNG",
+                            data=image_to_bytes(adjusted_img, fmt="PNG"),
+                            file_name="brightness_contrast_result.png",
+                            mime="image/png",
+                            key="dl_bright_png"
+                        )
+                    with col_jpg:
+                        st.download_button(
+                            label="⬇️ Download JPG",
+                            data=image_to_bytes(adjusted_img, fmt="JPEG"),
+                            file_name="brightness_contrast_result.jpg",
+                            mime="image/jpeg",
+                            key="dl_bright_jpg"
+                        )
 
 # ===================== TEAM MEMBERS =====================
 
@@ -855,4 +1052,3 @@ for i in range(2, 4):
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
                 st.markdown(f"{t['team_group']} 5")
-
