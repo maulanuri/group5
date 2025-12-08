@@ -29,14 +29,14 @@ if "image_filter" not in st.session_state:
 
 translations = {
     "id": {
-        "title": "🧮 Transformasi Matriks dalam Pengolahan Citra",
+        "title": "🧮 Transformasi Matriks dalam Pengolahan Gambar",
         "subtitle": "📌 Demo interaktif transformasi matriks 2D dan filtering citra",
-        "app_goal": "🎯 **Tujuan aplikasi:** Demo interaktif yang menunjukkan bagaimana transformasi matriks 2D dan filtering citra bekerja pada gambar menggunakan konsep aljabar linier.",
+        "app_goal": "🎯 **Tujuan aplikasi:** Demo interaktif yang menunjukkan bagaimana transformasi matriks 2D dan filtering Gambar bekerja pada gambar menggunakan konsep aljabar linier.",
         "features": "- 🔁 Transformasi: translasi, scaling, rotasi, shearing, refleksi\n- 🧹 Filtering: blur, sharpen, deteksi tepi, penghapusan background, grayscale, brightness & contrast",
         "concept_1_title": "### 🧊 Transformasi matriks 2D",
-        "concept_1_text1": "Sebuah citra 2D dapat dilihat sebagai kumpulan titik \\((x, y)\\) yang dapat dipindahkan menggunakan operasi linear seperti translasi, scaling, rotasi, shearing, dan refleksi, yang direpresentasikan oleh matriks 2×2 atau 3×3 (koordinat homogen).",
+        "concept_1_text1": "Sebuah Gambar 2D dapat dilihat sebagai kumpulan titik \\((x, y)\\) yang dapat dipindahkan menggunakan operasi linear seperti translasi, scaling, rotasi, shearing, dan refleksi, yang direpresentasikan oleh matriks 2×2 atau 3×3 (koordinat homogen).",
         "concept_1_text2": "Mengalikan koordinat piksel dengan matriks-matriks ini mengubah posisinya: scaling mengubah ukuran, rotasi memutar gambar di sekitar pusat, shearing membuat bentuk miring, dan refleksi membalik gambar pada sumbu yang dipilih.",
-        "concept_2_title": "### 📐 Filtering citra (konvolusi)",
+        "concept_2_title": "### 📐 Filtering Gambar (konvolusi)",
         "concept_2_text1": "Filtering menggunakan kernel kecil (matriks konvolusi) yang digeser pada gambar; di setiap posisi menghasilkan nilai piksel baru dari jumlah produk antara kernel dan piksel tetangganya.",
         "concept_2_text2": "Kernel dengan nilai positif seragam menghaluskan atau mengaburkan gambar, sementara kernel dengan pusat positif kuat dan tetangga negatif mempertajam dan menekankan tepi.",
         "concept_3_title": "### 🕹️ Mengapa interaktif?",
@@ -49,7 +49,7 @@ translations = {
         "upload_success": "✅ Gambar berhasil diunggah!",
         "upload_preview": "🖼️ Pratinjau Gambar Asli",
         "upload_info": "⬆️ Silakan unggah gambar terlebih dahulu untuk menggunakan alat di bawah ini.",
-        "tools_title": "### 🛠️ Alat Pengolahan Citra",
+        "tools_title": "### 🛠️ Alat Pengolahan Gambar",
         "tools_subtitle": "🎛️ Pilih kotak di bawah untuk membuka pengaturan transformasi atau filter.",
         "geo_title": "#### 🔁 Transformasi Geometri",
         "geo_desc": "Transformasi geometri mengubah posisi, ukuran, dan orientasi piksel menggunakan operasi linear (matriks).",
@@ -78,11 +78,11 @@ translations = {
         "refl_settings": "**🪞 Pengaturan Refleksi**",
         "refl_axis": "Sumbu refleksi",
         "refl_result": "Hasil Refleksi",
-        "hist_title": "#### 📊 Histogram Citra",
+        "hist_title": "#### 📊 Histogram Gambar",
         "hist_desc": "Histogram menunjukkan distribusi intensitas piksel (gelap–terang), berguna untuk menganalisis brightness dan kontras.",
         "btn_histogram": "Tampilkan Histogram 📈",
         "hist_warning": "Silakan unggah gambar terlebih dahulu untuk menampilkan histogram.",
-        "filter_title": "#### 🧮 Filtering Citra",
+        "filter_title": "#### 🧮 Filtering Gambar",
         "filter_desc": "Filtering mengubah nilai piksel berdasarkan tetangganya (konvolusi) untuk melakukan blur, sharpen, deteksi tepi, penghapusan background, dan lainnya.",
         "btn_blur": "🔲 Blur",
         "btn_sharpen": "✨ Sharpen",
@@ -1052,3 +1052,4 @@ for i in range(2, 4):
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
                 st.markdown(f"{t['team_group']} 5")
+
