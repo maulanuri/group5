@@ -4,7 +4,8 @@ import cv2
 from PIL import Image
 import matplotlib.pyplot as plt
 import os
-from io import BytesIO  # <- untuk download image
+from io import BytesIO  
+import base64
 
 # ===================== CONFIG & THEME =====================
 
@@ -13,33 +14,41 @@ st.set_page_config(
     layout="wide"
 )
 # ---------- VIDEO BACKGROUND (HTML langsung) ----------
+def set_video_background(video_path: str):
+    """Set an mp4 video as full-screen background using HTML/CSS."""
+    if not os.path.exists(video_path):
+        return
 
-VIDEO_PATH = "assets/background.mp4"  # sesuaikan path ini dengan lokasi videomu
+    with open(video_path, "rb") as f:
+        data = f.read()
+    b64 = base64.b64encode(data).decode()
+    VIDEO_PATH = "assets/background.mp4" 
 
-st.markdown(
-    f"""
-    <style>
-    .video-bg {{
-        position: fixed;
-        right: 0;
-        bottom: 0;
-        min-width: 100%;
-        min-height: 100%;
-        width: auto;
-        height: auto;
-        z-index: -1;
-        object-fit: cover;
-    }}
-    .stApp {{
-        background: transparent !important;
-    }}
-    </style>
-    <video class="video-bg" autoplay muted loop playsinline>
-        <source src="{VIDEO_PATH}" type="video/mp4">
-    </video>
-    """,
-    unsafe_allow_html=True,
-)
+    st.markdown(
+        f"""
+        <style>
+        .video-bg {{
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -1;
+            object-fit: cover;
+        }}
+        .stApp {{
+            background: transparent !important;
+        }}
+        </style>
+        <video class="video-bg" autoplay muted loop playsinline>
+            <source src="{VIDEO_PATH}" type="video/mp4">
+        </video>
+        """,
+        unsafe_allow_html=True,
+    )
+set_video_background("assets/background.mp4")
 
 # ----- Initialize Session State -----
 if "theme_mode" not in st.session_state:
@@ -251,7 +260,6 @@ lang = st.session_state["language"]
 t = translations[lang]
 theme_mode = st.session_state["theme_mode"]
 
-# Bungkus title + tombol dalam box
 with st.container(border=True):
     # Title dan controls dalam 3 kolom sejajar
     header_col1, header_col2, header_col3 = st.columns([6, 1, 1], vertical_alignment="center")
@@ -311,7 +319,6 @@ div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div[da
     border: 2px solid #4CAF50 !important;
     border-radius: 12px !important;
 }
-
 /* Team member photo container - square with crop */
 .team-photo-container {
     width: 140px;
@@ -325,7 +332,6 @@ div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div[da
     background: #f0f0f0;
     border: 3px solid #4CAF50;
 }
-
 .team-photo-container img {
     width: 100%;
     height: 100%;
@@ -462,16 +468,13 @@ def manual_convolution_gray(img_gray, kernel):
     k_h, k_w = kernel.shape
     pad_h = k_h // 2
     pad_w = k_w // 2
-
     padded = np.pad(img_gray, ((pad_h, pad_h), (pad_w, pad_w)), mode="reflect")
     h, w = img_gray.shape
     output = np.zeros_like(img_gray, dtype=np.float32)
-
     for i in range(h):
         for j in range(w):
             region = padded[i:i + k_h, j:j + k_w]
             output[i, j] = np.sum(region * kernel)
-
     output = np.clip(output, 0, 255).astype(np.uint8)
     return output
 
@@ -1080,6 +1083,7 @@ for i in range(2, 4):
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
                 st.markdown(f"{t['team_group']} 5")
+
 
 
 
