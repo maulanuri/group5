@@ -222,25 +222,27 @@ lang = st.session_state["language"]
 t = translations[lang]
 theme_mode = st.session_state["theme_mode"]
 
-# Title and controls in columns at the very top
-header_col1, header_col2, header_col3 = st.columns([6, 1, 1])
+# Bungkus title + tombol dalam box
+with st.container(border=True):
+    # Title dan controls dalam 3 kolom sejajar
+    header_col1, header_col2, header_col3 = st.columns([6, 1, 1], vertical_alignment="center")
 
-with header_col1:
-    st.title(t["title"])
+    with header_col1:
+        st.title(t["title"])
 
-with header_col2:
-    # Language toggle - shows opposite language
-    lang_button_text = "🇬🇧 EN" if lang == "id" else "🇮🇩 ID"
-    if st.button(lang_button_text, key="lang_toggle", use_container_width=True):
-        st.session_state["language"] = "en" if lang == "id" else "id"
-        st.rerun()
+    with header_col2:
+        # Language toggle - shows opposite language
+        lang_button_text = "🇬🇧 EN" if lang == "id" else "🇮🇩 ID"
+        if st.button(lang_button_text, key="lang_toggle", use_container_width=True):
+            st.session_state["language"] = "en" if lang == "id" else "id"
+            st.rerun()
 
-with header_col3:
-    # Theme toggle - shows opposite mode icon
-    theme_button_text = "🌙 Dark" if theme_mode == "light" else "☀️ Light"
-    if st.button(theme_button_text, key="theme_toggle", use_container_width=True):
-        st.session_state["theme_mode"] = "dark" if theme_mode == "light" else "light"
-        st.rerun()
+    with header_col3:
+        # Theme toggle - shows opposite mode icon
+        theme_button_text = "🌙 Dark" if theme_mode == "light" else "☀️ Light"
+        if st.button(theme_button_text, key="theme_toggle", use_container_width=True):
+            st.session_state["theme_mode"] = "dark" if theme_mode == "light" else "light"
+            st.rerun()
 
 st.subheader(t["subtitle"])
 
@@ -250,12 +252,14 @@ base_css = """
 <style>
 .block-container {
     max-width: 1200px;
-    padding: 1.2rem 2rem;
+    padding: 2.5rem 2rem 1.2rem 2rem;  /* padding-top diperbesar */
 }
 section[data-testid="stExpander"]{
     border-radius:10px;
     padding:8px;
     box-shadow:0 1px 6px rgba(0,0,0,0.04);
+    margin-bottom:10px;
+    background-color: var(--stLightBlue-50);
 }
 section[data-testid="stExpander"] .streamlit-expanderHeader{
     font-size:16px;
