@@ -345,14 +345,9 @@ div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div[da
 
 light_css = """
 <style>
-body, .stApp {
-    background: linear-gradient(135deg, #e8f5e9 0%, #ffffff 25%, #e3f2fd 50%, #f5f5f5 75%, #e8f5e9 100%) !important;
-    color: #1b5e20 !important;
-}
 .stMarkdown, .stMarkdown p, .stMarkdown li {
     color: #1b5e20 !important;
 }
-/* Better visibility for toggles in light mode */
 button[kind="secondary"] {
     background-color: #ffffff !important;
     color: #1b5e20 !important;
@@ -372,17 +367,12 @@ button[kind="secondary"]:hover {
 
 dark_css = """
 <style>
-body, .stApp {
-    background: linear-gradient(135deg, #1b3a1b 0%, #0e1117 25%, #0d1b2a 50%, #1a1a1a 75%, #1b3a1b 100%) !important;
-    color: #c8e6c9 !important;
-}
 .stMarkdown, .stMarkdown p, .stMarkdown li {
     color: #c8e6c9 !important;
 }
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
     background-color: rgba(27, 58, 27, 0.3) !important;
 }
-/* Better visibility for toggles in dark mode */
 button[kind="secondary"] {
     background-color: #1e3a1e !important;
     color: #c8e6c9 !important;
@@ -399,9 +389,7 @@ button[kind="secondary"]:hover {
 }
 </style>
 """
-
 st.markdown(base_css, unsafe_allow_html=True)
-
 if theme_mode == "light":
     st.markdown(light_css, unsafe_allow_html=True)
 else:
@@ -1085,6 +1073,7 @@ for i in range(2, 4):
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
                 st.markdown(f"{t['team_group']} 5")
+
 
 
 
