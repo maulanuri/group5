@@ -153,6 +153,7 @@ translations = {
         "team_subtitle": "Kelompok 5 – Anggota dan Peran",
         "team_sid": "**NIM:**",
         "team_role": "**Peran:**",
+        "team_contribution": "Kontribusi:",
         "team_group": "**Kelompok:**",
         "axis_x": "Sumbu-X",
         "axis_y": "Sumbu-Y",
@@ -247,6 +248,7 @@ translations = {
         "team_sid": "**SID:**",
         "team_role": "**Role:**",
         "team_group": "**Group:**",
+        "team_contribution": "Contribution:",
         "axis_x": "X-axis",
         "axis_y": "Y-axis",
         "axis_diag": "Diagonal",
@@ -480,6 +482,314 @@ def adjust_brightness_contrast(img_rgb, brightness=0, contrast=0):
     adjusted = cv2.convertScaleAbs(img_bgr, alpha=alpha, beta=beta)
     return to_streamlit(adjusted)
 
+def image_to_bytes(img_rgb, fmt="PNG"):
+    """
+    Convert numpy image (RGB, RGBA, or grayscale) to bytes for download.
+
+    - PNG: simpan apa adanya (termasuk alpha/transparan).
+    - JPEG: otomatis buang alpha (RGBA -> RGB) agar tidak error.
+    """
+    if img_rgb is None:
+        raise ValueError("image_to_bytes received None image")
+
+    arr = np.array(img_rgb)
+
+    # Grayscale -> RGB
+    if arr.ndim == 2:
+        arr = cv2.cvtColor(arr, cv2.COLOR_GRAY2RGB)
+
+    # JPEG tidak mendukung alpha channel
+    if fmt.upper() == "JPEG" and arr.ndim == 3 and arr.shape[2] == 4:
+        arr = arr[:, :, :3]
+
+    pil_img = Image.fromarray(arr.astype("uint8"))
+    buf = BytesIO()
+    pil_img.save(buf, format=fmt)
+    return buf.getvalue()
+
+# ===================== ADVANCED BACKGROUND HELPERS =====================
+
+def _feather_mask(mask: np.ndarray, radius: int) -> np.ndarray:
+    """Feather/smooth mask edges using Gaussian blur."""
+    if radius <= 0:
+        m = mask.astype(np.float32)
+        if m.max() > 1.0:
+            m = m / 255.0
+        return m
+
+    m = mask.astype(np.float32)
+    if m.max() > 1.0:
+        m = m / 255.0
+
+    ksize = radius * 2 + 1
+    m_blur = cv2.GaussianBlur(m, (ksize, ksize), 0)
+    return np.clip(m_blur, 0.0, 1.0)
+
+
+def _refine_hair_region(image_rgb: np.ndarray,
+                        mask: np.ndarray,
+                        refine_hair: bool = True) -> np.ndarray:
+    """Refine mask around hair and fine details using edge cues."""
+    m = mask.copy().astype(np.uint8)
+    if m.max() > 1:
+        m = (m > 127).astype(np.uint8)
+
+    if not refine_hair:
+        return m
+
+    img_bgr = to_opencv(image_rgb)
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150)
+    edge_dilated = cv2.dilate(edges, np.ones((3, 3), np.uint8))
+
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+
+    m[edge_dilated > 0] = 1
+    return m.astype(np.uint8)
+
+
+def _remove_small_holes(mask: np.ndarray,
+                        min_area: int = 100) -> np.ndarray:
+    """Remove small holes inside the foreground mask."""
+    m = mask.copy().astype(np.uint8)
+    if m.max() > 1:
+        m = (m > 127).astype(np.uint8)
+
+    inv = (1 - m).astype(np.uint8)
+    contours, _ = cv2.findContours(inv, cv2.RETR_EXTERNAL,
+                                   cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in contours:
+        if cv2.contourArea(cnt) < min_area:
+            cv2.drawContours(inv, [cnt], -1, 0, thickness=cv2.FILLED)
+
+    cleaned = 1 - inv
+    return cleaned.astype(np.uint8)
+
+
+def _apply_solid_background(image_rgb: np.ndarray,
+                            mask_float: np.ndarray,
+                            color: tuple[int, int, int]) -> np.ndarray:
+    """Replace background with solid RGB color."""
+    h, w = image_rgb.shape[:2]
+    bg = np.full((h, w, 3), color, dtype=np.uint8)
+
+    alpha = mask_float[:, :, None]
+    out = (alpha * image_rgb.astype(np.float32) +
+           (1.0 - alpha) * bg.astype(np.float32))
+    return out.astype(np.uint8)
+
+
+def _apply_blur_background(image_rgb: np.ndarray,
+                           mask_float: np.ndarray,
+                           ksize: int = 21) -> np.ndarray:
+    """Blur only the background while keeping subject sharp."""
+    if ksize % 2 == 0:
+        ksize += 1
+    blurred = cv2.GaussianBlur(image_rgb, (ksize, ksize), 0)
+
+    alpha = mask_float[:, :, None]
+    out = (alpha * image_rgb.astype(np.float32) +
+           (1.0 - alpha) * blurred.astype(np.float32))
+    return out.astype(np.uint8)
+
+
+def segment_foreground(image: np.ndarray) -> np.ndarray:
+    """
+    SIMPLE foreground segmentation.
+
+    Untuk sementara: subject dianggap di tengah gambar (ellipse).
+    Nanti bisa kamu ganti dengan model segmentasi beneran.
+    """
+    h, w = image.shape[:2]
+    mask = np.zeros((h, w), dtype=np.uint8)
+
+    center = (w // 2, h // 2)
+    axes = (int(w * 0.35), int(h * 0.45))
+    cv2.ellipse(mask, center, axes, 0, 0, 360, 255, -1)
+
+    return mask
+
+
+# ===================== ADVANCED BACKGROUND MAIN FUNCTION =====================
+
+def remove_background_advanced(
+    image: np.ndarray,
+    mode: str = "auto",
+    target_background_type: str | None = None,
+    output_mode: str = "transparent",
+    solid_color: tuple[int, int, int] | None = None,
+    feather_radius: int = 3,
+    refine_hair: bool = True,
+) -> np.ndarray:
+    """
+    Advanced background removal supporting multiple background types and outputs.
+    """
+    if image is None:
+        raise ValueError("Input image is None")
+
+    if image.ndim != 3 or image.shape[2] != 3:
+        raise ValueError("`image` must be RGB with shape (H, W, 3)")
+
+    h, w = image.shape[:2]
+    img_bgr = to_opencv(image)
+    img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    img_lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
+    L_channel = img_lab[:, :, 0]
+
+    bg_type = (target_background_type or mode or "auto").lower()
+
+    # ---------- RAW MASK PER MODE ----------
+    if bg_type in ["solid", "studio"]:
+        border_thick = max(5, min(h, w) // 20)
+        border_pixels = np.concatenate([
+            img_hsv[:border_thick, :, :].reshape(-1, 3),
+            img_hsv[-border_thick:, :, :].reshape(-1, 3),
+            img_hsv[:, :border_thick, :].reshape(-1, 3),
+            img_hsv[:, -border_thick:, :].reshape(-1, 3),
+        ], axis=0)
+        bg_color = np.median(border_pixels, axis=0).astype(np.float32)
+
+        hsv_flat = img_hsv.reshape(-1, 3).astype(np.float32)
+        dist = np.linalg.norm(hsv_flat - bg_color[None, :], axis=1)
+        dist_img = dist.reshape(h, w)
+        thresh = np.percentile(dist_img, 60)
+        raw_mask = (dist_img > thresh).astype(np.uint8)
+
+    elif bg_type == "gradient":
+        L_norm = cv2.normalize(L_channel, None, 0, 255, cv2.NORM_MINMAX)
+        edges = cv2.Canny(L_norm, 50, 150)
+        thr = cv2.adaptiveThreshold(
+            L_norm, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 21, 5
+        )
+        raw_mask = ((thr == 255) | (edges > 0)).astype(np.uint8)
+
+    elif bg_type == "textured":
+        prior_mask = segment_foreground(image)
+        if prior_mask.max() > 1:
+            prior_mask = (prior_mask > 127).astype(np.uint8)
+
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 80, 160)
+        prior_dilated = cv2.dilate(prior_mask, np.ones((7, 7), np.uint8))
+        edge_near_prior = cv2.dilate(edges, np.ones((5, 5), np.uint8))
+        raw_mask = ((prior_dilated == 1) | (edge_near_prior > 0)).astype(np.uint8)
+
+    elif bg_type == "natural":
+        prior_mask = segment_foreground(image)
+        if prior_mask.max() > 1:
+            prior_mask = (prior_mask > 127).astype(np.uint8)
+
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 80, 200)
+
+        border_thick = max(5, min(h, w) // 20)
+        border_pixels = img_lab[:border_thick, :, :].reshape(-1, 3)
+        bg_L = np.median(border_pixels[:, 0])
+
+        L_diff = np.abs(L_channel.astype(np.float32) - bg_L)
+        contrast_mask = (L_diff > 15).astype(np.uint8)
+
+        raw_mask = ((prior_mask == 1) | (edges > 0)) & contrast_mask
+
+    elif bg_type == "minimalist":
+        border_thick = max(5, min(h, w) // 20)
+        border_pixels = img_hsv[:border_thick, :, :].reshape(-1, 3)
+        bg_color = np.median(border_pixels, axis=0).astype(np.float32)
+
+        hsv_flat = img_hsv.reshape(-1, 3).astype(np.float32)
+        dist = np.linalg.norm(hsv_flat - bg_color[None, :], axis=1)
+        dist_img = dist.reshape(h, w)
+        thresh = np.percentile(dist_img, 70)
+        raw_mask = (dist_img > thresh).astype(np.uint8)
+
+    elif bg_type == "abstract":
+        prior_mask = segment_foreground(image)
+        if prior_mask.max() > 1:
+            prior_mask = (prior_mask > 127).astype(np.uint8)
+
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 50, 150)
+
+        raw = ((prior_mask == 1) | (edges > 0)).astype(np.uint8)
+        raw = cv2.morphologyEx(raw, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+        raw_mask = raw
+
+    elif bg_type == "vintage":
+        L_blur = cv2.GaussianBlur(L_channel, (5, 5), 0)
+        _, thr = cv2.threshold(L_blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        raw = thr == 255
+        raw = cv2.morphologyEx(raw.astype(np.uint8), cv2.MORPH_OPEN,
+                               np.ones((3, 3), np.uint8))
+        raw_mask = raw
+
+    else:
+        # AUTO: analisa rata/tidaknya brightness di border
+        border_thick = max(5, min(h, w) // 20)
+        border_pixels = img_lab[:border_thick, :, :].reshape(-1, 3)
+        L_border = border_pixels[:, 0]
+        std_L = np.std(L_border)
+
+        if std_L < 5:
+            return remove_background_advanced(
+                image=image,
+                mode="solid",
+                target_background_type="solid",
+                output_mode=output_mode,
+                solid_color=solid_color,
+                feather_radius=feather_radius,
+                refine_hair=refine_hair,
+            )
+        elif std_L < 15:
+            return remove_background_advanced(
+                image=image,
+                mode="gradient",
+                target_background_type="gradient",
+                output_mode=output_mode,
+                solid_color=solid_color,
+                feather_radius=feather_radius,
+                refine_hair=refine_hair,
+            )
+        else:
+            return remove_background_advanced(
+                image=image,
+                mode="textured",
+                target_background_type="textured",
+                output_mode=output_mode,
+                solid_color=solid_color,
+                feather_radius=feather_radius,
+                refine_hair=refine_hair,
+            )
+
+    # ---------- POST-PROCESSING MASK ----------
+    mask_clean = _remove_small_holes(raw_mask, min_area=100)
+    mask_refined_bin = _refine_hair_region(image, mask_clean, refine_hair=refine_hair)
+    mask_float = _feather_mask(mask_refined_bin, radius=feather_radius)
+
+    # ---------- OUTPUT ----------
+    if output_mode == "custom_mask":
+        return (mask_float * 255.0).astype(np.uint8)
+
+    if output_mode == "transparent":
+        alpha = (mask_float * 255.0).astype(np.uint8)
+        rgba = np.dstack([image.astype(np.uint8), alpha])
+        return rgba
+
+    if output_mode == "solid_color":
+        if solid_color is None:
+            solid_color = (255, 255, 255)
+        rgb_out = _apply_solid_background(image.astype(np.uint8),
+                                          mask_float, solid_color)
+        return rgb_out
+
+    if output_mode == "blurred":
+        rgb_out = _apply_blur_background(image.astype(np.uint8),
+                                         mask_float, ksize=25)
+        return rgb_out
+
+    raise ValueError(f"Unsupported output_mode: {output_mode}")
+
 def compute_histogram(img_rgb):
     img_bgr = to_opencv(img_rgb)
     color = ('b', 'g', 'r')
@@ -506,8 +816,24 @@ def simple_background_removal_hsv(img_rgb):
     return fg_rgb
 
 def image_to_bytes(img_rgb, fmt="PNG"):
-    """Convert numpy RGB image to bytes for download."""
-    pil_img = Image.fromarray(img_rgb.astype("uint8"))
+    """
+    Convert numpy RGB or RGBA image to bytes for download.
+    - PNG: akan simpan apa adanya (termasuk alpha/transparan).
+    - JPEG: otomatis buang alpha (RGBA -> RGB) agar tidak error.
+    """
+    if img_rgb is None:
+        raise ValueError("image_to_bytes received None image")
+
+    arr = np.array(img_rgb)
+    # kalau grayscale, naikkan ke RGB
+    if arr.ndim == 2:
+        arr = cv2.cvtColor(arr, cv2.COLOR_GRAY2RGB)
+
+    # kalau JPEG, buang alpha dulu kalau ada
+    if fmt.upper() == "JPEG" and arr.ndim == 3 and arr.shape[2] == 4:
+        arr = arr[:, :, :3]
+
+    pil_img = Image.fromarray(arr.astype("uint8"))
     buf = BytesIO()
     pil_img.save(buf, format=fmt)
     return buf.getvalue()
@@ -819,13 +1145,13 @@ with tools_col_left:
             else:
                 st.warning(t["hist_warning"])
 
-# ==================== RIGHT: IMAGE FILTERING ====================
 with tools_col_right:
     with st.container(border=True):
         st.markdown(t["filter_title"])
         st.write(t["filter_desc"])
         st.markdown("---")
 
+        # Tombol pilih filter
         filter_col1, filter_col2, filter_col3 = st.columns(3)
         with filter_col1:
             if st.button(t["btn_blur"], key="btn_blur_click", type="secondary"):
@@ -851,10 +1177,16 @@ with tools_col_right:
         if original_img is None:
             st.info(t["filter_info"])
         else:
+            # ===================== RIGHT IMAGE FILTERING =====================
+
+            # ---- BLUR ----
             if st.session_state["image_filter"] == "blur":
                 st.markdown(t["blur_settings"])
                 kernel_size = st.selectbox(
-                    t["blur_kernel"], [3, 5, 7], index=0, key="blur_kernel_size"
+                    t["blur_kernel"],
+                    [3, 5, 7],
+                    index=0,
+                    key="blur_kernel_size"
                 )
                 if st.button(f"{t['btn_apply']} ✅", key="btn_apply_blur", type="primary"):
                     gray = rgb_to_gray(original_img)
@@ -862,6 +1194,7 @@ with tools_col_right:
                     blur_kernel = np.ones((k, k), dtype=np.float32) / (k * k)
                     blurred_gray = manual_convolution_gray(gray, blur_kernel)
                     blurred_rgb = cv2.cvtColor(blurred_gray, cv2.COLOR_GRAY2RGB)
+
                     st.image(blurred_rgb, caption=t["blur_result"], use_column_width=True)
 
                     col_png, col_jpg = st.columns(2)
@@ -882,6 +1215,7 @@ with tools_col_right:
                             key="dl_blur_jpg"
                         )
 
+            # ---- SHARPEN ----
             elif st.session_state["image_filter"] == "sharpen":
                 st.markdown(t["sharpen_settings"])
                 st.write(t["sharpen_desc"])
@@ -895,6 +1229,7 @@ with tools_col_right:
                     )
                     sharpened_gray = manual_convolution_gray(gray, sharpen_kernel)
                     sharpened_rgb = cv2.cvtColor(sharpened_gray, cv2.COLOR_GRAY2RGB)
+
                     st.image(sharpened_rgb, caption=t["sharpen_result"], use_column_width=True)
 
                     col_png, col_jpg = st.columns(2)
@@ -915,41 +1250,111 @@ with tools_col_right:
                             key="dl_sharp_jpg"
                         )
 
+            # ---- BACKGROUND REMOVAL / REPLACE ----
             elif st.session_state["image_filter"] == "background":
                 st.markdown(t["bg_settings"])
                 method = st.selectbox(
                     t["bg_method"],
-                    ["HSV Color Thresholding"],
+                    [
+                        "HSV Color Thresholding",
+                        "Blur Background",
+                        "Remove Background (Transparent)",
+                        "Solid Red Background",
+                        "Solid Blue Background",
+                        "Solid Yellow Background",
+                        "Solid Green Background",
+                        "Solid Brown Background",
+                    ],
                     key="bg_method"
                 )
+
                 if st.button(f"{t['btn_apply']} ✅", key="btn_apply_bg", type="primary"):
-                    bg_removed_img = simple_background_removal_hsv(original_img)
-                    st.image(bg_removed_img, caption=t["bg_result"], use_column_width=True)
+                    bg_removed_img = None
+                    output_for_download = None
 
-                    col_png, col_jpg = st.columns(2)
-                    with col_png:
-                        st.download_button(
-                            label="⬇️ Download PNG",
-                            data=image_to_bytes(bg_removed_img, fmt="PNG"),
-                            file_name="background_result.png",
-                            mime="image/png",
-                            key="dl_bg_png"
-                        )
-                    with col_jpg:
-                        st.download_button(
-                            label="⬇️ Download JPG",
-                            data=image_to_bytes(bg_removed_img, fmt="JPEG"),
-                            file_name="background_result.jpg",
-                            mime="image/jpeg",
-                            key="dl_bg_jpg"
-                        )
+                    try:
+                        if method == "HSV Color Thresholding":
+                            bg_removed_img = simple_background_removal_hsv(original_img)
+                            output_for_download = bg_removed_img
+                        else:
+                            if method == "Blur Background":
+                                output_mode = "blurred"
+                                solid_color = None
+                            elif method == "Remove Background (Transparent)":
+                                output_mode = "transparent"
+                                solid_color = None
+                            elif method == "Solid Red Background":
+                                output_mode = "solid_color"
+                                solid_color = (255, 0, 0)
+                            elif method == "Solid Blue Background":
+                                output_mode = "solid_color"
+                                solid_color = (0, 0, 255)
+                            elif method == "Solid Yellow Background":
+                                output_mode = "solid_color"
+                                solid_color = (255, 255, 0)
+                            elif method == "Solid Green Background":
+                                output_mode = "solid_color"
+                                solid_color = (0, 255, 0)
+                            elif method == "Solid Brown Background":
+                                output_mode = "solid_color"
+                                solid_color = (150, 75, 0)
+                            else:
+                                output_mode = "transparent"
+                                solid_color = None
 
+                            result = remove_background_advanced(
+                                image=original_img,
+                                mode="auto",
+                                output_mode=output_mode,
+                                solid_color=solid_color,
+                                feather_radius=3,
+                                refine_hair=True,
+                            )
+
+                            bg_removed_img = result
+
+                            if result.ndim == 3 and result.shape[2] == 4:
+                                output_for_download = result[:, :, :3]
+                            else:
+                                output_for_download = result
+
+                    except Exception as e:
+                        st.error(f"Error saat memproses background: {e}")
+                        bg_removed_img = None
+                        output_for_download = None
+
+                    if bg_removed_img is not None:
+                        st.image(bg_removed_img, caption=t["bg_result"], use_column_width=True)
+
+                        col_png, col_jpg = st.columns(2)
+                        with col_png:
+                            st.download_button(
+                                label="⬇️ Download PNG",
+                                data=image_to_bytes(bg_removed_img, fmt="PNG"),
+                                file_name="background_result.png",
+                                mime="image/png",
+                                key="dl_bg_png"
+                            )
+                        with col_jpg:
+                            if output_for_download is not None:
+                                st.download_button(
+                                    label="⬇️ Download JPG",
+                                    data=image_to_bytes(output_for_download, fmt="JPEG"),
+                                    file_name="background_result.jpg",
+                                    mime="image/jpeg",
+                                    key="dl_bg_jpg"
+                                )
+                    else:
+                        st.warning("Gagal menghasilkan gambar background. Coba metode lain atau gambar lain.")
+
+            # ---- GRAYSCALE ----
             elif st.session_state["image_filter"] == "grayscale":
                 st.markdown(t["gray_settings"])
                 st.write(t["gray_desc"])
                 if st.button(f"{t['btn_apply']} ✅", key="btn_apply_gray", type="primary"):
                     gray_img = rgb_to_gray(original_img)
                     gray_rgb = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2RGB)
+
                     st.image(gray_rgb, caption=t["gray_result"], use_column_width=True)
 
                     col_png, col_jpg = st.columns(2)
@@ -970,6 +1375,7 @@ with tools_col_right:
                             key="dl_gray_jpg"
                         )
 
+            # ---- EDGE DETECTION ----
             elif st.session_state["image_filter"] == "edge":
                 st.markdown(t["edge_settings"])
                 method_edge = st.selectbox(
@@ -988,6 +1394,7 @@ with tools_col_right:
                         edges = cv2.Canny(gray, 100, 200)
                         edge_bgr = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
                     edge_img = to_streamlit(edge_bgr)
+
                     st.image(edge_img, caption=f"{t['edge_result']} ({method_edge})", use_column_width=True)
 
                     col_png, col_jpg = st.columns(2)
@@ -1008,12 +1415,14 @@ with tools_col_right:
                             key="dl_edge_jpg"
                         )
 
+            # ---- BRIGHTNESS / CONTRAST ----
             elif st.session_state["image_filter"] == "brightness":
                 st.markdown(t["bright_settings"])
                 brightness = st.slider(t["bright_brightness"], -100, 100, 0, key="brightness_value")
                 contrast = st.slider(t["bright_contrast"], -100, 100, 0, key="contrast_value")
                 if st.button(f"{t['btn_apply']} ✅", key="btn_apply_bright", type="primary"):
                     adjusted_img = adjust_brightness_contrast(original_img, brightness, contrast)
+
                     st.image(adjusted_img, caption=t["bright_result"], use_column_width=True)
 
                     col_png, col_jpg = st.columns(2)
@@ -1040,10 +1449,10 @@ st.markdown(t["team_title"])
 st.write(t["team_subtitle"])
 
 members = [
-    {"img": "images/aditya.jpg", "name": "ADITYA ANGGARA PAMUNGKAS", "sid": "04202400051", "role": "Leader"},
-    {"img": "images/maula_aqiel.jpg", "name": "MAULA AQIEL NURI", "sid": "04202400023", "role": "Member"},
-    {"img": "images/syafiq_nur.jpg", "name": "SYAFIQ NUR RAMADHAN", "sid": "04202400073", "role": "Member"},
-    {"img": "images/rifat_fitrotu.jpg", "name": "RIFAT FITROTU SALMAN", "sid": "04202400106", "role": "Member"},
+    {"img": "images/aditya.jpg", "name": "ADITYA ANGGARA PAMUNGKAS", "sid": "04202400051", "role": "Leader", "Contribution": "Project Manager, Geometric Transformations Module"},
+    {"img": "images/maula_aqiel.jpg", "name": "MAULA AQIEL NURI", "sid": "04202400023", "role": "Member", "Contribution": "Image Filtering Module, UI/UX Design"},
+    {"img": "images/syafiq_nur.jpg", "name": "SYAFIQ NUR RAMADHAN", "sid": "04202400073", "role": "Member", "Contribution": "Background Removal Module, Image Upload & Download"},
+    {"img": "images/rifat_fitrotu.jpg", "name": "RIFAT FITROTU SALMAN", "sid": "04202400106", "role": "Member", "Contribution": "Histogram Module, Image Processing Functions"},
 ]
 
 cols_row1 = st.columns(2, vertical_alignment="top")
@@ -1059,6 +1468,7 @@ for i in range(2):
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
                 st.markdown(f"{t['team_group']} 5")
+                st.markdown(f"{t['team_contribution']} {m['Contribution']}")
 
 cols_row2 = st.columns(2, vertical_alignment="top")
 for i in range(2, 4):
@@ -1073,9 +1483,5 @@ for i in range(2, 4):
                 st.markdown(f"{t['team_sid']} {m['sid']}")
                 st.markdown(f"{t['team_role']} {m['role']}")
                 st.markdown(f"{t['team_group']} 5")
-
-
-
-
-
+                st.markdown(f"{t['team_contribution']} {m['Contribution']}")
 
