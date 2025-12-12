@@ -83,6 +83,8 @@ translations = {
         "concept_3_text2": "Ini membantu menghubungkan struktur matriks atau kernel dengan efek visualnya, membuat konsep seperti transformasi linear dan konvolusi lebih intuitif.",
         "quick_concepts": "#### 📖 Konsep singkat",
         "quick_concepts_text": "- 🔁 Transformasi 2D: mengubah posisi piksel (translasi, scaling, rotasi, shearing, refleksi).\n- 🧮 Konvolusi: kernel kecil yang digeser pada gambar untuk menghasilkan nilai piksel baru.",
+        "upload_explanation_title": "### Cara Mengupload Foto",
+        "upload_explanation_text": "1. Klik tombol 'Unggah gambar di sini (PNG/JPG/JPEG) 📂'.\n2. Pilih file gambar dari perangkat Anda.\n3. Tunggu hingga gambar berhasil diunggah dan ditampilkan.\n4. Setelah itu, Anda dapat menggunakan alat pengolahan gambar di bawah ini.",
         "upload_title": "### 🖼️ Unggah Gambar",
         "upload_label": "Unggah gambar di sini (PNG/JPG/JPEG) 📂",
         "upload_success": "✅ Gambar berhasil diunggah!",
@@ -160,6 +162,8 @@ translations = {
         "axis_diag": "Diagonal",
         "dark_mode": "Mode Gelap",
         "light_mode": "Mode Terang",
+        "upload_explanation_title": "Penjelasan cara mengunggah foto",
+        "upload_explanation_text": "1. Klik tombol 'Unggah gambar di sini (PNG/JPG/JPEG) 📂'.\n2. Pilih file gambar dari perangkat Anda.\n3. Tunggu hingga gambar berhasil diunggah dan ditampilkan.\n4. Setelah itu, Anda dapat menggunakan alat pengolahan gambar di bawah ini.",
     },
     "en": {
         "title": "🧮 Matrix Transformations in Image Processing",
@@ -254,6 +258,8 @@ translations = {
         "axis_diag": "Diagonal",
         "dark_mode": "Dark Mode",
         "light_mode": "Light Mode",
+        "upload_explanation_title": "Explanation on how to upload a photo",
+        "upload_explanation_text": "1. Click the 'Upload an image here (PNG/JPG/JPEG) 📂' button.\n2. Select an image file from your device.\n3. Wait for the image to be successfully uploaded and displayed.\n4. After that, you can use the image processing tools below.",
     }
 }
 
@@ -345,39 +351,23 @@ div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div[da
 </style>
 """
 
-light_css = """
-<style>
-.stMarkdown, .stMarkdown p, .stMarkdown li {
-    color: #1b5e20 !important;
-}
-button[kind="secondary"] {
-    background-color: #ffffff !important;
-    color: #1b5e20 !important;
-    border: 2px solid #4CAF50 !important;
-    font-weight: 600 !important;
-}
-button[kind="secondary"]:hover {
-    background-color: #e8f5e9 !important;
-    border-color: #2e7d32 !important;
-}
-.team-photo-container {
-    background: #e8f5e9;
-    border-color: #4CAF50;
-}
-</style>
-"""
+light_css = '''<style>
+button[kind='secondary'] { background-color: #ffffff !important; color: #000000 !important; border: 2px solid #4CAF50 !important; font-weight: 600 !important; }
+button[kind='secondary']:hover { background-color: #e8f5e9 !important; border-color: #2e7d32 !important; }
+.team-photo-container { background: #e8f5e9; border-color: #4CAF50; }
+</style>'''
 
 dark_css = """
 <style>
 .stMarkdown, .stMarkdown p, .stMarkdown li {
-    color: #c8e6c9 !important;
+    color: #ffffff !important;
 }
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
     background-color: rgba(27, 58, 27, 0.3) !important;
 }
 button[kind="secondary"] {
     background-color: #1e3a1e !important;
-    color: #c8e6c9 !important;
+    color: #ffffff !important;
     border: 2px solid #66bb6a !important;
     font-weight: 600 !important;
 }
@@ -902,6 +892,12 @@ for p in placeholder_files:
 with st.container(border=True):
     st.markdown(t["quick_concepts"])
     st.markdown(t["quick_concepts_text"])
+
+# ===================== UPLOAD EXPLANATION =====================
+
+with st.container(border=True):
+    st.markdown(t["upload_explanation_title"])
+    st.markdown(t["upload_explanation_text"])
 
 # ===================== UPLOAD IMAGE =====================
 
@@ -1447,6 +1443,7 @@ with tools_col_right:
 
 st.markdown(t["team_title"])
 st.write(t["team_subtitle"])
+
 
 members = [
     {"img": "images/aditya.jpg", "name": "ADITYA ANGGARA PAMUNGKAS", "sid": "04202400051", "role": "Leader", "Contribution": "Project Manager, Geometric Transformations Module"},
